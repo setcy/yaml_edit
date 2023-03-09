@@ -96,20 +96,28 @@ String _tryYamlEncodeSingleQuoted(String string) {
 String _tryYamlEncodeFolded(String string, int indentation, String lineEnding) {
   String result;
 
-  final trimmedString = string.trimRight();
-  final removedPortion = string.substring(trimmedString.length);
+  final rightTrimmedString = string.trimRight();
+  final rightRemovedPortion = string.substring(rightTrimmedString.length);
 
-  if (removedPortion.contains('\n')) {
-    result = '>+\n' + ' ' * indentation;
+  final leftTrimmedString = string.trimLeft();
+  final leftRemovedPortion =
+      string.substring(0, string.length - leftTrimmedString.length);
+
+  if (rightRemovedPortion.contains('\n')) {
+    result = '>+';
   } else {
-    result = '>-\n' + ' ' * indentation;
+    result = '>-';
   }
+  if (leftRemovedPortion.contains(' ')) {
+    result += indentation.toString();
+  }
+  result += lineEnding + ' ' * indentation;
 
   /// [emptyBegin] records the previous line starts with a space or is empty.
   /// If neither the previous line nor current line starts with a space or
   /// is not empty, it will duplicate the newline and preserves it in YAML.
   var emptyBegin = false;
-  final lines = trimmedString.split('\n');
+  final lines = rightTrimmedString.split('\n');
   for (var i = 0; i < lines.length; i++) {
     final line = lines[i];
 
@@ -118,8 +126,6 @@ String _tryYamlEncodeFolded(String string, int indentation, String lineEnding) {
       continue;
     }
 
-    /// Assumes the user did not try to account for windows documents by using
-    /// `\r\n` already
     if (line.startsWith(' ') || line.isEmpty) {
       result += lineEnding + ' ' * indentation + line;
       emptyBegin = true;
@@ -133,7 +139,7 @@ String _tryYamlEncodeFolded(String string, int indentation, String lineEnding) {
     }
   }
 
-  return result + removedPortion;
+  return result + rightRemovedPortion;
 }
 
 /// Generates a YAML-safe literal string.
@@ -143,11 +149,26 @@ String _tryYamlEncodeFolded(String string, int indentation, String lineEnding) {
 /// function.
 String _tryYamlEncodeLiteral(
     String string, int indentation, String lineEnding) {
-  final result = '|-\n$string';
+  String result;
 
-  /// Assumes the user did not try to account for windows documents by using
-  /// `\r\n` already
-  return result.replaceAll('\n', lineEnding + ' ' * indentation);
+  final rightTrimmedString = string.trimRight();
+  final rightRemovedPortion = string.substring(rightTrimmedString.length);
+
+  final leftTrimmedString = string.trimLeft();
+  final leftRemovedPortion =
+  string.substring(0, string.length - leftTrimmedString.length);
+
+  if (rightRemovedPortion.contains('\n')) {
+    result = '|+';
+  } else {
+    result = '|-';
+  }
+  if (leftRemovedPortion.contains(' ')) {
+    result += indentation.toString();
+  }
+  result += lineEnding + string;
+
+  return result.replaceAll('\n', '\n' + ' ' * indentation);
 }
 
 /// Returns [value] with the necessary formatting applied in a flow context
@@ -203,16 +224,12 @@ String yamlEncodeBlockScalar(
         return _tryYamlEncodeSingleQuoted(value.value);
       }
 
-      // Strings with only white spaces will cause a misparsing
-      if (value.value.trim().length == value.value.length &&
-          value.value.length != 0) {
-        if (value.style == ScalarStyle.FOLDED) {
-          return _tryYamlEncodeFolded(value.value, indentation, lineEnding);
-        }
+      if (value.style == ScalarStyle.FOLDED) {
+        return _tryYamlEncodeFolded(value.value, indentation, lineEnding);
+      }
 
-        if (value.style == ScalarStyle.LITERAL) {
-          return _tryYamlEncodeLiteral(value.value, indentation, lineEnding);
-        }
+      if (value.style == ScalarStyle.LITERAL) {
+        return _tryYamlEncodeLiteral(value.value, indentation, lineEnding);
       }
     }
 
